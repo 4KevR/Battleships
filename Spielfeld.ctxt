@@ -1,0 +1,15 @@
+#BlueJ class context
+comment0.target=Spielfeld
+comment1.params=
+comment1.target=Spielfeld()
+comment2.params=pSpielfeld
+comment2.target=void\ initSpielfeld(char[][])
+comment3.params=
+comment3.target=void\ zeigeSpielfeld()
+comment4.params=pFeld
+comment4.target=void\ schiffSetzen(java.lang.String)
+comment5.params=pFeld
+comment5.target=char\ gibFeld(java.lang.String)
+comment6.params=pFeld\ pZeichen
+comment6.target=void\ setzeFeld(java.lang.String,\ char)
+numComments=7
