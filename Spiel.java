@@ -14,7 +14,7 @@ import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
 
-public class Game extends Application {
+public class Spiel extends Application {
     Stage window;
     Group rootSpieler1 = this.makeGrids();
     Group rootSpieler2 = this.makeGrids();
@@ -26,7 +26,7 @@ public class Game extends Application {
     
     int intAktuellerSpieler = 0;
     
-    public Game() {
+    public Spiel() {
     }
     
     public void startGame() {

@@ -1,11 +1,11 @@
 #BlueJ package file
-dependency1.from=Game
+dependency1.from=Spiel
 dependency1.to=MouseFieldHover
 dependency1.type=UsesDependency
-editor.fx.0.height=0
-editor.fx.0.width=0
-editor.fx.0.x=0
-editor.fx.0.y=0
+editor.fx.0.height=737
+editor.fx.0.width=814
+editor.fx.0.x=360
+editor.fx.0.y=28
 objectbench.height=141
 objectbench.width=1512
 package.divider.horizontal=0.6
@@ -35,7 +35,7 @@ target1.width=110
 target1.x=70
 target1.y=190
 target2.height=50
-target2.name=Game
+target2.name=Spiel
 target2.showInterface=false
 target2.type=ClassTarget
 target2.width=80
