@@ -2,6 +2,7 @@ public class Spieler {
      
      private String playername = "";
      Spielfeld meinSpielfeld = new Spielfeld();
+     char[] letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
     
      public Spieler(String pPlayerName) {
          playername = pPlayerName;
@@ -23,49 +24,83 @@ public class Spieler {
             letterToInt(String.valueOf(pStartkoordinate.charAt(0))),
             Integer.parseInt(String.valueOf(pStartkoordinate.charAt(1)))
         };
-        String finaleKoordinaten = "";
-        System.out.println(intStart[0]);
-        System.out.println(intStart[1]);
+        String finaleKoordinaten = "--";
+        //System.out.println(intStart[0]);
+        //System.out.println(intStart[1]);
         boolean valid = true;
         switch(pAusrichtung) {
             case 0:
                 for(int i = intStart[0]; i > intStart[0] - pLaenge; i--) {
-                    finaleKoordinaten += intToLetter(i) + String.valueOf(intStart[1]);
-                    valid = invalid(i, intStart[1]);
+                    valid = invalid(i, intStart[1], finaleKoordinaten.substring(finaleKoordinaten.length()-2, finaleKoordinaten.length()));
+                    if (valid) {
+                        finaleKoordinaten += intToLetter(i) + String.valueOf(intStart[1]);
+                    } else {
+                        break;
+                    }
                 }
                 break;
 
             case 1:
                 for(int i = intStart[1]; i < intStart[1] + pLaenge; i++) {
-                    finaleKoordinaten += intToLetter(intStart[0]) + String.valueOf(i);
-                    valid = invalid(intStart[0], i);
+                    valid = invalid(intStart[0], i, finaleKoordinaten.substring(finaleKoordinaten.length()-2, finaleKoordinaten.length()));
+                    if (valid) {
+                        finaleKoordinaten += intToLetter(intStart[0]) + String.valueOf(i);
+                    } else {
+                        break;
+                    }
                 }
                 break;
 
             case 2:
                 for(int i = intStart[0]; i < intStart[0] + pLaenge; i++) {
-                    finaleKoordinaten += intToLetter(i) + String.valueOf(intStart[1]);
-                    valid = invalid(i, intStart[1]);
+                    valid = invalid(i, intStart[1], finaleKoordinaten.substring(finaleKoordinaten.length()-2, finaleKoordinaten.length()));
+                    if (valid) {
+                        finaleKoordinaten += intToLetter(i) + String.valueOf(intStart[1]);
+                    } else {
+                        break;
+                    }
                 }
                 break;
 
             case 3:
-                for(int i = intStart[1]; i < intStart[1] - pLaenge; i--) {
-                    finaleKoordinaten += intToLetter(intStart[0]) + String.valueOf(i);
-                    valid = invalid(intStart[1], i);
+                for(int i = intStart[1]; i > intStart[1] - pLaenge; i--) {
+                    valid = invalid(intStart[0], i, finaleKoordinaten.substring(finaleKoordinaten.length()-2, finaleKoordinaten.length()));
+                    if (valid) {
+                        finaleKoordinaten += intToLetter(intStart[0]) + String.valueOf(i);
+                    } else {
+                        break;
+                    }
                 }
                 break;
         }
         if (valid) {
-            for(int counter = 0; counter < finaleKoordinaten.length(); counter=counter+2) {
+            //System.out.println(finaleKoordinaten);
+            for(int counter = 2; counter < finaleKoordinaten.length(); counter=counter+2) {
+                //System.out.println(finaleKoordinaten.substring(counter, counter+2));
                 meinSpielfeld.schiffSetzen(finaleKoordinaten.substring(counter, counter+2));
             }
         }
         return valid;
      } 
      
-     private boolean invalid(int letter, int number) {
-         if(letter >= 0 && letter <= 10 && number >= 0 && number <= 10) { return true; } else { return false; }
+     private boolean invalid(int letter, int number, String letztesFeld) {
+         System.out.println(letztesFeld);
+         int counterSchiff = 0;
+         for (int y = letter-1; y < letter+2; y++) {
+             for (int x = number-1; x < number+2; x++) {
+                 if (y >= 0 && y <= 9 && x >= 0 && x <= 9) {
+                     String feldPrüfung = intToLetter(y)+String.valueOf(x);
+                     if (meinSpielfeld.gibFeld(feldPrüfung) == '#' && !feldPrüfung.equals(letztesFeld)) {
+                         counterSchiff += 1;
+                     }
+                 }
+             }
+         }
+         if(letter >= 0 && letter <= 9 && number >= 0 && number <= 9 && counterSchiff == 0) { 
+             return true;
+         } else { 
+             return false; 
+         }
      }
      public int letterToInt(String letter) { 
          char[] letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
@@ -80,7 +115,6 @@ public class Spieler {
      }
      
      public String intToLetter(int position) {
-         char[] letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
          return String.valueOf(letters[position]);
      }
      

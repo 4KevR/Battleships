@@ -15,7 +15,7 @@ public class Spielfeld {
     }
     
     public void zeigeSpielfeld() {
-        System.out.println(" 0123456789");
+        System.out.println(" 12345678910");
         for (int i=0;i<seefeld.length;i++) {
             int  asciiZahl    = 65+i;
             char asciiZeichen = (char)asciiZahl;

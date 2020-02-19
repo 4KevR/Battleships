@@ -30,7 +30,7 @@ public class Spiel {
     
     private void setzeSchiffe (){
         System.out.println("\n"+names[intAktuellerSpieler]+": Setze deine Schiffe!");
-        int [] laengeSchiffe = {5, 4};//4, 3, 3, 3, 2, 2, 2, 2};
+        int [] laengeSchiffe = {5, 4, 4, 3, 3, 3, 2, 2, 2, 2};
         for (int schiff: laengeSchiffe) {
             boolean validSchiff = false;
             while (validSchiff == false) {
@@ -62,6 +62,9 @@ public class Spiel {
                 //Schiff überprüfen
                 System.out.println(feld + " " + ausrichtung + " " + String.valueOf(schiff));
                 validSchiff = spieler[intAktuellerSpieler].setzeSchiff(feld, Integer.parseInt(ausrichtung), schiff);
+                if (!validSchiff) {
+                    System.out.println("Ungültige Eingabe!");
+                }
             }
         }
         System.out.println("\nSchiffe setzen beendet! Das ist dein Spielfeld:\n");
