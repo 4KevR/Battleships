@@ -25,12 +25,30 @@ public class Spielfeld {
             }
             System.out.println();
         }
-    }    
+    }
+    
+    public void zeigeSpielfeldFuerGegner() {
+        System.out.println(" 12345678910");
+        for (int i=0;i<seefeld.length;i++) {
+            int  asciiZahl    = 65+i;
+            char asciiZeichen = (char)asciiZahl;
+            System.out.print( asciiZeichen  );
+            for (int j=0;j<seefeld.length;j++) {
+                if (seefeld[i][j] != '#') {
+                    System.out.print(seefeld[i][j]);
+                } else {
+                    System.out.print('~');
+                }
+            }
+            System.out.println();
+        }
+    }
+    
     public void schiffSetzen (String pFeld){
         int zahl = (int) pFeld.charAt(0);
         zahl = zahl - 65;
-        System.out.println(zahl);
-        System.out.println(pFeld.charAt(1)-48);
+        //System.out.println(zahl);
+        //System.out.println(pFeld.charAt(1)-48);
         seefeld[zahl][pFeld.charAt(1)-48] = '#';        
     }
     public char gibFeld (String pFeld){
