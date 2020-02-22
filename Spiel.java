@@ -7,7 +7,7 @@ public class Spiel {
     String [] names = new String[2];
     Spieler [] spieler = new Spieler[2];
     
-    int [] laengeSchiffe = {5, 4, 4, 3, 3, 3, 2, 2, 2, 2};
+    int [] laengeSchiffe = {5, 4 ,4, 3, 3, 3, 2, 2, 2, 2};
    
     public Spiel() {
         System.out.println("Spiel Schiffeversenken!\n");
