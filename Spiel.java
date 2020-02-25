@@ -46,7 +46,7 @@ public class Spiel {
                 int tester = 0;
                 while (tester == 0) {
                     System.out.print("Gebe Ausrichtung des Schiffs an: ");
-                    ausrichtung = sc.nextLine().strip();
+                    ausrichtung = sc.nextLine().trim();
                     if (ausrichtung.equals("1") || ausrichtung.equals("0") || ausrichtung.equals("2") || ausrichtung.equals("3")) {
                         tester = 1;
                     } else {
@@ -56,7 +56,7 @@ public class Spiel {
                 tester = 0;
                 while (tester == 0) {
                     System.out.print("Gebe Startfeld des Schiffs an: ");
-                    feld = sc.nextLine().strip();
+                    feld = sc.nextLine().trim();
                     if(this.pruefeEingabe(feld) == 1) {
                         tester = 1;
                     } else {
@@ -119,7 +119,7 @@ public class Spiel {
             String feld = "";
             while (tester == 0) {
                 System.out.print("\nGebe Feld zum Schießen an: ");
-                feld = sc.nextLine().strip();
+                feld = sc.nextLine().trim();
                 if(this.pruefeEingabe(feld) == 1) {
                     tester = 1;
                 } else {
