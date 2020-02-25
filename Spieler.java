@@ -93,13 +93,14 @@ public class Spieler {
      } 
      
      private boolean invalid(int letter, int number, String letztesFeld) {
-         String feldPrüfung = intToLetter(letter)+String.valueOf(number);
-         int anzahlSchiff = this.countSchiffe(feldPrüfung, letztesFeld);
-         if(letter >= 0 && letter <= 9 && number >= 0 && number <= 9 && anzahlSchiff == 0) { 
-             return true;
-         } else { 
-             return false; 
+         if(letter >= 0 && letter <= 9 && number >= 0 && number <= 9) { 
+             String feldPrüfung = intToLetter(letter)+String.valueOf(number);
+             int anzahlSchiff = this.countSchiffe(feldPrüfung, letztesFeld);
+             if (anzahlSchiff == 0) {
+                 return true;
+             }
          }
+         return false;
      }
      
      public int letterToInt(String letter) { 
