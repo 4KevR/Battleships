@@ -1,7 +1,0 @@
-#BlueJ class context
-comment0.target=MouseFieldHover
-comment1.params=canvasHover
-comment1.target=MouseFieldHover(javafx.scene.canvas.Canvas)
-comment2.params=ev
-comment2.target=void\ handle(javafx.scene.input.MouseEvent)
-numComments=3
