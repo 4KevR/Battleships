@@ -28,12 +28,16 @@ public class Game extends Application {
     double screenHeight = gd.getDisplayMode().getHeight()*0.6;
 
     Stage window;
+
     VBox startGroup = new VBox();
     VBox enterNamesGroup = new VBox();
     StackPane gameGroup = new StackPane();
+    VBox waitGroup = new VBox();
+
     Scene startScene;
     Scene enterNamesScene;
     Scene gameScene;
+    Scene waitScene;
 
     Label lbl;
     double opacity = 0;
@@ -41,16 +45,20 @@ public class Game extends Application {
     int actualPlayer = 0;
 
     int [] shipLengths = {5, 4 ,4, 3, 3, 3, 2, 2, 2, 2};
+    int actualShip = 0;
 
     Player [] players = new Player[2];
 
-    public static void main(String[] args) {
+    ResizableCanvas canvasHover;
+    ResizableCanvas showShips;
+    EventHandler<MouseEvent> mouseEvent;
+
+    public static void main (String[] args) {
         launch();
     }
 
-    //Needs for JavaFX
     @Override
-    public void start(Stage stage) throws Exception {
+    public void start (Stage stage) throws Exception {
         window = stage;
         window.setMinWidth(640);
         window.setMinHeight(360);
@@ -58,7 +66,7 @@ public class Game extends Application {
         this.startGame();
     }
 
-    public void startGame() {
+    public void startGame () {
         startGroup.setAlignment(Pos.CENTER);
 
         lbl = new Label("Battleships!");
@@ -66,7 +74,7 @@ public class Game extends Application {
         lbl.setTranslateY(-100);
         startGroup.getChildren().add(lbl);
 
-        AnimationTimer timer = new MyTimer();
+        AnimationTimer timer = new fadeIn();
         timer.start();
 
         Button [] button = {new Button("Singleplayer"), new Button("Multiplayer")};
@@ -75,14 +83,14 @@ public class Game extends Application {
         startGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
         startGroup.getChildren().addAll(button[0], button[1]);
 
-        for(int i = 0; i < 2; i++) {
+        for (int i = 0; i < 2; i++) {
             int finalI = i;
             button[i].setOnAction(actionEvent -> this.enterNames(finalI));
             button[i].setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
         }
 
         DropShadow shadow = new DropShadow();
-        for(int i = 0; i < 2; i++) {
+        for (int i = 0; i < 2; i++) {
             int finalI = i;
             button[i].addEventHandler(MouseEvent.MOUSE_ENTERED,
                     e -> button[finalI].setEffect(shadow));
@@ -98,7 +106,7 @@ public class Game extends Application {
         window.show();
     }
 
-    private void enterNames(int playerMode) {
+    private void enterNames (int playerMode) {
         HBox hb = new HBox();
         hb.setAlignment(Pos.CENTER);
 
@@ -107,7 +115,7 @@ public class Game extends Application {
         hb.getChildren().addAll(label1, textField1);
 
         TextField textField2 = new TextField();
-        if(playerMode == 1) {
+        if (playerMode == 1) {
             Label label2 = new Label("Name Player 2:");
             hb.getChildren().addAll(label2, textField2);
         }
@@ -129,14 +137,14 @@ public class Game extends Application {
                 e -> submit.setEffect(null));
 
         int numberOfShipPoints = 0;
-        for(int ship: shipLengths) {
+        for (int ship: shipLengths) {
             numberOfShipPoints += ship;
         }
 
         int finalNumberOfShipPoints = numberOfShipPoints;
         submit.setOnAction(actionEvent ->  {
             players[0] = new Player(textField1.getText(), finalNumberOfShipPoints);
-            if(playerMode == 1) {
+            if (playerMode == 1) {
                 players[1] = new Player(textField2.getText(), finalNumberOfShipPoints);
             }
             this.placeShips();
@@ -147,58 +155,110 @@ public class Game extends Application {
         window.setScene(enterNamesScene);
     }
 
-    private void placeShips() {
+    private void placeShips () {
+        gameGroup = new StackPane();
         this.resizableCanvasUtility(0);
+
+        showShips = new ResizableCanvas(2, players[actualPlayer]);
+        gameGroup.getChildren().add(showShips);
+        showShips.widthProperty().bind(gameGroup.widthProperty());
+        showShips.heightProperty().bind(gameGroup.heightProperty());
 
         HBox hb = new HBox();
         hb.setAlignment(Pos.TOP_LEFT);
-        Label labelShipPlayer = new Label(players[0].getName() + ": Place your ships!");
+        Label labelShipPlayer = new Label(players[actualPlayer].getName() + ": Place your ships!");
         labelShipPlayer.setFont(new Font("Times New Roman", (40.0 / 1920) * screenWidth));
         labelShipPlayer.setTranslateX(10); labelShipPlayer.setTranslateY(10);
         hb.getChildren().add(labelShipPlayer);
+
         gameGroup.getChildren().add(hb);
-
-        ResizableCanvas canvasHover  = this.resizableCanvasUtility(1);
-        EventHandler<MouseEvent> mouseEvent = new MouseFieldHover(canvasHover);
-        canvasHover.addEventHandler(MouseEvent.ANY, mouseEvent);
-
-        gameGroup.setAlignment(Pos.BOTTOM_RIGHT);
         gameGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
-
         gameScene = new Scene(gameGroup,  screenWidth, screenHeight);
 
         window.setScene(gameScene);
+
+        this.utilityPlaceShips();
+
+        gameGroup.setOnMouseClicked(utilityPlaceShipEvent -> {
+            if (utilityPlaceShipEvent.getButton() == MouseButton.PRIMARY) {
+                showShips.draw(2);
+                this.utilityPlaceShips();
+            }
+        });
     }
 
-    private void step() {
+    private void utilityPlaceShips () {
+        if(actualShip != shipLengths.length) {
+            canvasHover = this.resizableCanvasUtility(1);
+            mouseEvent = new MousePlaceShip(canvasHover, shipLengths[actualShip], players[actualPlayer]);
+            canvasHover.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
+            players[actualPlayer].myArea.zeigeSpielfeld();
+            actualShip += 1;
+        } else {
+            actualPlayer = (actualPlayer+1)%2;
+            actualShip = 0;
+
+            if(actualPlayer == 1) {
+                this.waitForNext(0);
+            } else {
+                waitGroup = new VBox();
+                this.waitForNext(1);
+            }
+        }
+    }
+
+    private void step () {
 
     }
 
-    private void waitForNext() {
+    private void waitForNext (int mode) {
+        Label label = new Label("Are you "+players[actualPlayer].getName()+"?");
 
+        Button submit = new Button("Continue");
+        submit.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+
+        waitGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
+        waitGroup.setAlignment(Pos.CENTER);
+        waitGroup.setSpacing(20);
+        waitGroup.getChildren().addAll(label, submit);
+
+        DropShadow shadow = new DropShadow();
+        submit.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                e -> submit.setEffect(shadow));
+        submit.addEventHandler(MouseEvent.MOUSE_EXITED,
+                e -> submit.setEffect(null));
+
+        submit.setOnAction(actionEvent ->  {
+            if (mode == 0) {
+                this.placeShips();
+            } else {
+                this.step();
+            }
+        });
+
+        waitScene = new Scene(waitGroup,  screenWidth, screenHeight);
+
+        window.setScene(waitScene);
     }
 
-    private ResizableCanvas resizableCanvasUtility(int mode) {
-        ResizableCanvas canvas = new ResizableCanvas(mode);
+    private ResizableCanvas resizableCanvasUtility (int mode) {
+        ResizableCanvas canvas = new ResizableCanvas(mode, players[actualPlayer]);
 
         gameGroup.getChildren().add(canvas);
         canvas.widthProperty().bind(gameGroup.widthProperty());
         canvas.heightProperty().bind(gameGroup.heightProperty());
 
-        return (canvas);
+        return canvas;
     }
 
-    private class MyTimer extends AnimationTimer {
-
+    private class fadeIn extends AnimationTimer {
         @Override
-        public void handle(long now) {
-            opacity += 0.01;
+        public void handle (long now) {
+            opacity += 0.02;
             lbl.opacityProperty().set(opacity);
-
             if (opacity >= 1) {
                 stop();
             }
-
         }
     }
 }
