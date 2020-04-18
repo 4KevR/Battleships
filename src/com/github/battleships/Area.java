@@ -18,6 +18,7 @@ public class Area {
     public void placeShip (int [] coordinates){
         this.area[coordinates[1]][coordinates[0]] = '#';
     }
+
     public char giveField (int [] coordinates){
         return this.area[coordinates[1]][coordinates[0]];
     }

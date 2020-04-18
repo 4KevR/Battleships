@@ -3,6 +3,8 @@ package com.github.battleships;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 
+import javafx.beans.property.DoubleProperty;
+import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
 import javafx.scene.*;
 import javafx.scene.control.Button;
@@ -32,7 +34,6 @@ public class Game extends Application {
     VBox startGroup = new VBox();
     VBox enterNamesGroup = new VBox();
     StackPane gameGroup = new StackPane();
-    VBox waitGroup = new VBox();
 
     Scene startScene;
     Scene enterNamesScene;
@@ -43,15 +44,27 @@ public class Game extends Application {
     double opacity = 0;
 
     int actualPlayer = 0;
+    int playerMode = 0;
 
     int [] shipLengths = {5, 4 ,4, 3, 3, 3, 2, 2, 2, 2};
     int actualShip = 0;
+    Label labelShipPlayer = new Label();
 
     Player [] players = new Player[2];
+    int cacheHitAttempts = 0;
+    int cacheHitShips = 0;
 
-    ResizableCanvas canvasHover;
+    Button completeStep = new Button("Complete Step");
+
+    DropShadow shadow = new DropShadow();
+
+    ResizableCanvas grid;
+    ResizableCanvas canvasHoverPlaceShip;
+    ResizableCanvas canvasHoverShoot;
     ResizableCanvas showShips;
     EventHandler<MouseEvent> mouseEvent;
+
+    DoubleProperty mouseAreaHeight = new SimpleDoubleProperty();
 
     public static void main (String[] args) {
         launch();
@@ -60,8 +73,9 @@ public class Game extends Application {
     @Override
     public void start (Stage stage) throws Exception {
         window = stage;
-        window.setMinWidth(640);
-        window.setMinHeight(360);
+        window.setMinWidth(640); window.setMinHeight(360);
+        //window.setWidth(screenWidth); window.setHeight(screenHeight);
+        //window.setFullScreen(true);
 
         this.startGame();
     }
@@ -99,7 +113,7 @@ public class Game extends Application {
                     e -> button[finalI1].setEffect(null));
         }
 
-        startScene = new Scene(startGroup,  screenWidth, screenHeight);
+        startScene = new Scene(startGroup, screenWidth, screenHeight);
 
         window.setTitle("Battleships!");
         window.setScene(startScene);
@@ -107,6 +121,7 @@ public class Game extends Application {
     }
 
     private void enterNames (int playerMode) {
+        this.playerMode = playerMode;
         HBox hb = new HBox();
         hb.setAlignment(Pos.CENTER);
 
@@ -122,133 +137,204 @@ public class Game extends Application {
 
         hb.setSpacing(10);
 
-        Button submit = new Button("Submit");
-        submit.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+        Button submitNames = new Button("Submit");
+        submitNames.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
 
         enterNamesGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
         enterNamesGroup.setAlignment(Pos.CENTER);
         enterNamesGroup.setSpacing(20);
-        enterNamesGroup.getChildren().addAll(hb, submit);
+        enterNamesGroup.getChildren().addAll(hb, submitNames);
 
-        DropShadow shadow = new DropShadow();
-        submit.addEventHandler(MouseEvent.MOUSE_ENTERED,
-                e -> submit.setEffect(shadow));
-        submit.addEventHandler(MouseEvent.MOUSE_EXITED,
-                e -> submit.setEffect(null));
+        submitNames.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                e -> submitNames.setEffect(shadow));
+        submitNames.addEventHandler(MouseEvent.MOUSE_EXITED,
+                e -> submitNames.setEffect(null));
 
-        int numberOfShipPoints = 0;
-        for (int ship: shipLengths) {
-            numberOfShipPoints += ship;
-        }
-
-        int finalNumberOfShipPoints = numberOfShipPoints;
-        submit.setOnAction(actionEvent ->  {
-            players[0] = new Player(textField1.getText(), finalNumberOfShipPoints);
+        submitNames.setOnAction(actionEvent ->  {
+            players[0] = new Player(textField1.getText(), 0, shipLengths);
             if (playerMode == 1) {
-                players[1] = new Player(textField2.getText(), finalNumberOfShipPoints);
+                players[1] = new Player(textField2.getText(), 0, shipLengths);
+            } else {
+                players[1] = new Player("Computer", 1, shipLengths);
             }
             this.placeShips();
         });
 
-        enterNamesScene = new Scene(enterNamesGroup,  screenWidth, screenHeight);
+        enterNamesScene = new Scene(enterNamesGroup, startScene.getWidth(), startScene.getHeight());
 
         window.setScene(enterNamesScene);
     }
 
     private void placeShips () {
-        gameGroup = new StackPane();
-        this.resizableCanvasUtility(0);
+        if (playerMode == 1 || actualPlayer == 0) {
+            //Show grid
+            grid = new ResizableCanvas(0, players, actualPlayer);
+            gameGroup.getChildren().add(grid);
+            grid.widthProperty().bind(gameGroup.widthProperty());
+            grid.heightProperty().bind(gameGroup.heightProperty());
 
-        showShips = new ResizableCanvas(2, players[actualPlayer]);
-        gameGroup.getChildren().add(showShips);
-        showShips.widthProperty().bind(gameGroup.widthProperty());
-        showShips.heightProperty().bind(gameGroup.heightProperty());
+            //Show placed ships
+            showShips = new ResizableCanvas(2, players, actualPlayer);
+            gameGroup.getChildren().add(showShips);
+            showShips.widthProperty().bind(gameGroup.widthProperty());
+            showShips.heightProperty().bind(gameGroup.heightProperty());
 
-        HBox hb = new HBox();
-        hb.setAlignment(Pos.TOP_LEFT);
-        Label labelShipPlayer = new Label(players[actualPlayer].getName() + ": Place your ships!");
-        labelShipPlayer.setFont(new Font("Times New Roman", (40.0 / 1920) * screenWidth));
-        labelShipPlayer.setTranslateX(10); labelShipPlayer.setTranslateY(10);
-        hb.getChildren().add(labelShipPlayer);
+            //Display text
+            HBox hb = new HBox();
+            hb.setAlignment(Pos.TOP_LEFT);
+            labelShipPlayer.setText(players[actualPlayer].getName() + ": Place your ships!");
+            labelShipPlayer.setFont(new Font("Times New Roman", (40.0 / 1920) * screenWidth));
+            labelShipPlayer.setTranslateX(10);
+            labelShipPlayer.setTranslateY(10);
+            hb.getChildren().add(labelShipPlayer);
 
-        gameGroup.getChildren().add(hb);
-        gameGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
-        gameScene = new Scene(gameGroup,  screenWidth, screenHeight);
+            HBox hb2 = new HBox();
+            hb2.setAlignment(Pos.BOTTOM_RIGHT);
 
-        window.setScene(gameScene);
+            completeStep.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+            completeStep.setTranslateX(-20);
+            completeStep.setTranslateY(-10);
+            completeStep.setVisible(false);
+            completeStep.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                    e -> completeStep.setEffect(shadow));
+            completeStep.addEventHandler(MouseEvent.MOUSE_EXITED,
+                    e -> completeStep.setEffect(null));
+            completeStep.setOnAction(actionEvent -> this.waitForNext(1));
 
-        this.utilityPlaceShips();
+            Button quitGame = new Button("Quit Game");
+            quitGame.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+            quitGame.setTranslateX(-10);
+            quitGame.setTranslateY(-10);
+            quitGame.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                    e -> quitGame.setEffect(shadow));
+            quitGame.addEventHandler(MouseEvent.MOUSE_EXITED,
+                    e -> quitGame.setEffect(null));
+            quitGame.setOnAction(actionEvent -> System.exit(0));
 
-        gameGroup.setOnMouseClicked(utilityPlaceShipEvent -> {
-            if (utilityPlaceShipEvent.getButton() == MouseButton.PRIMARY) {
-                showShips.draw(2);
-                this.utilityPlaceShips();
-            }
-        });
+            hb2.getChildren().addAll(completeStep, quitGame);
+
+            gameGroup.getChildren().addAll(hb, hb2);
+            gameGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
+            gameScene = new Scene(gameGroup, enterNamesScene.getWidth(), enterNamesScene.getHeight());
+
+            gameScene.heightProperty().addListener(evt -> setNewPropertyHeight(gameScene.getHeight()));
+
+            window.setScene(gameScene);
+
+            this.utilityPlaceShips();
+
+            gameGroup.setOnMouseClicked(utilityPlaceShipEvent -> {
+                if (utilityPlaceShipEvent.getButton() == MouseButton.PRIMARY) {
+                    if (players[actualPlayer].placedShips != players[actualPlayer].numberOfShipPoints || actualShip == shipLengths.length) {
+                        //Placing ship
+                        int shouldPlaceShip = 0;
+                        for (int counter = 0; counter < actualShip; counter++) {
+                            shouldPlaceShip += shipLengths[counter];
+                        }
+                        if (players[actualPlayer].placedShips == shouldPlaceShip) {
+                            gameGroup.getChildren().remove(canvasHoverPlaceShip);
+                            showShips.draw(2, actualPlayer);
+                            this.utilityPlaceShips();
+                        }
+                    } else {
+                        //shooting
+                        if (cacheHitAttempts != players[(actualPlayer+1)%2].hitAttempts) {
+                            if (cacheHitShips == players[(actualPlayer+1)%2].hitShips) {
+                                gameGroup.getChildren().remove(canvasHoverShoot);
+                                completeStep.setVisible(true);
+                            } else {
+                                cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
+                                cacheHitShips = players[(actualPlayer+1)%2].hitShips;
+                            }
+                            showShips.draw(2, actualPlayer);
+                        }
+                    }
+                }
+            });
+        }
     }
+
+    public final void setNewPropertyHeight (double value) { mouseAreaHeight.set((value)*(2./3)); }
 
     private void utilityPlaceShips () {
         if(actualShip != shipLengths.length) {
-            canvasHover = this.resizableCanvasUtility(1);
-            mouseEvent = new MousePlaceShip(canvasHover, shipLengths[actualShip], players[actualPlayer]);
-            canvasHover.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
-            players[actualPlayer].myArea.zeigeSpielfeld();
+            canvasHoverPlaceShip = new ResizableCanvas(1, players, actualPlayer);
+            gameGroup.getChildren().add(canvasHoverPlaceShip);
+            canvasHoverPlaceShip.widthProperty().bind(gameGroup.widthProperty());
+            canvasHoverPlaceShip.heightProperty().bind(mouseAreaHeight);
+
+            mouseEvent = new MousePlaceShip(canvasHoverPlaceShip, shipLengths[actualShip], players[actualPlayer]);
+            canvasHoverPlaceShip.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
+
             actualShip += 1;
         } else {
-            actualPlayer = (actualPlayer+1)%2;
             actualShip = 0;
 
-            if(actualPlayer == 1) {
+            if((actualPlayer+1)%2 == 1) {
                 this.waitForNext(0);
             } else {
-                waitGroup = new VBox();
                 this.waitForNext(1);
             }
         }
     }
 
     private void step () {
+        completeStep.setVisible(false);
 
+        labelShipPlayer.setText(players[actualPlayer].getName() + ": Attack!");
+
+        canvasHoverShoot = new ResizableCanvas(1, players, actualPlayer);
+        gameGroup.getChildren().add(canvasHoverShoot);
+        canvasHoverShoot.widthProperty().bind(gameGroup.widthProperty());
+        canvasHoverShoot.heightProperty().bind(mouseAreaHeight);
+
+        mouseEvent = new MouseShoot(canvasHoverShoot, players[(actualPlayer+1)%2]);
+        canvasHoverShoot.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
+
+        window.setScene(gameScene);
+
+        cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
+        cacheHitShips = players[(actualPlayer+1)%2].hitShips;
     }
 
     private void waitForNext (int mode) {
-        Label label = new Label("Are you "+players[actualPlayer].getName()+"?");
+        if (playerMode == 1) {
+            actualPlayer = (actualPlayer+1)%2;
 
-        Button submit = new Button("Continue");
-        submit.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+            VBox waitGroup = new VBox();
 
-        waitGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
-        waitGroup.setAlignment(Pos.CENTER);
-        waitGroup.setSpacing(20);
-        waitGroup.getChildren().addAll(label, submit);
+            Label label = new Label("Are you " + players[actualPlayer].getName() + "?");
 
-        DropShadow shadow = new DropShadow();
-        submit.addEventHandler(MouseEvent.MOUSE_ENTERED,
-                e -> submit.setEffect(shadow));
-        submit.addEventHandler(MouseEvent.MOUSE_EXITED,
-                e -> submit.setEffect(null));
+            Button submit = new Button("Continue");
+            submit.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
 
-        submit.setOnAction(actionEvent ->  {
-            if (mode == 0) {
-                this.placeShips();
-            } else {
-                this.step();
-            }
-        });
+            waitGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
+            waitGroup.setAlignment(Pos.CENTER);
+            waitGroup.setSpacing(20);
+            waitGroup.getChildren().addAll(label, submit);
 
-        waitScene = new Scene(waitGroup,  screenWidth, screenHeight);
+            DropShadow shadow = new DropShadow();
+            submit.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                    e -> submit.setEffect(shadow));
+            submit.addEventHandler(MouseEvent.MOUSE_EXITED,
+                    e -> submit.setEffect(null));
 
-        window.setScene(waitScene);
-    }
+            submit.setOnAction(actionEvent -> {
+                if (mode == 0) {
+                    gameGroup = new StackPane();
+                    this.placeShips();
+                } else {
+                    showShips.draw(2, actualPlayer);
+                    this.step();
+                }
+            });
 
-    private ResizableCanvas resizableCanvasUtility (int mode) {
-        ResizableCanvas canvas = new ResizableCanvas(mode, players[actualPlayer]);
+            waitScene = new Scene(waitGroup, gameScene.getWidth(), gameScene.getHeight());
 
-        gameGroup.getChildren().add(canvas);
-        canvas.widthProperty().bind(gameGroup.widthProperty());
-        canvas.heightProperty().bind(gameGroup.heightProperty());
-
-        return canvas;
+            window.setScene(waitScene);
+        } else {
+            this.step();
+        }
     }
 
     private class fadeIn extends AnimationTimer {

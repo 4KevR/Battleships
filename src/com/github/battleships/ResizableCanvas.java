@@ -8,15 +8,21 @@ import javafx.scene.text.Font;
 class ResizableCanvas extends Canvas {
     String[] textBoardX = {"", " 1", " 2", " 3", " 4", " 5", " 6", " 7", " 8", " 9", "10"};
     String[] textBoardY = {"", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
-    Player player;
+    Player [] players;
+    int actualPlayer;
 
-    public ResizableCanvas (int mode, Player player) {
-        widthProperty().addListener(evt -> draw(mode));
-        heightProperty().addListener(evt -> draw(mode));
-        this.player = player;
+    public ResizableCanvas (int mode, Player [] players, int actualPlayer) {
+        widthProperty().addListener(evt -> draw(mode, this.actualPlayer));
+        heightProperty().addListener(evt -> draw(mode, this.actualPlayer));
+        this.players = players;
+        this.actualPlayer = actualPlayer;
     }
 
-    public void draw (int mode) {
+    public void draw (int mode, int actualPlayer) {
+        if (this.actualPlayer != actualPlayer) {
+            this.actualPlayer = actualPlayer;
+        }
+
         double width = getWidth();
         double height = getHeight();
         if (width != 0 && height != 0) {
@@ -38,12 +44,16 @@ class ResizableCanvas extends Canvas {
                             gc.strokeText(textBoardX[xField],
                                     x - ((60.0 / 1920) * width), y - ((20.0 / 1080) * height));
                         } else {
-                            if (xField != 0 && grid != (960.0 / 1920) * width) {
+                            if (xField != 0) {
                                 for (int yField = 0; yField < 10; yField++) {
                                     int[] field = {xField-1, yField};
-                                    System.out.println((yField+1)*((72.0/1080)*height));
-                                    gc.strokeText(String.valueOf(player.myArea.giveField(field)),
-                                            x - ((60.0 / 1920) * width), y - ((20.0 / 1080) * height) + (yField+1)*((72.0/1080)*height));
+                                    int playerDraw = (int) ((int) grid/((960.0 / 1920) * width));
+                                    char fieldValue = players[(actualPlayer+playerDraw)%2].myArea.giveField(field);
+                                    if (fieldValue == '#' && grid != 0) {
+                                        fieldValue = '~';
+                                    }
+                                    gc.strokeText(String.valueOf(fieldValue),
+                                            x - ((60.0 / 1920) * width), y - ((20.0 / 1080) * height) + (yField + 1) * ((72.0 / 1080) * height));
                                 }
                             }
                         }

@@ -1,21 +1,32 @@
 package com.github.battleships;
 
-import java.util.Arrays;
+import java.util.Random;
 
 public class Player {
-
-    private String playerName = "";
+    private final String playerName;
     Area myArea = new Area();
-    int hitShips = 0;
-    int numberOfShipPoints;
+    public int hitShips = 0;
+    public int numberOfShipPoints;
+    private final int [] shipLengths;
+    public int placedShips = 0;
+    public int hitAttempts = 0;
 
-    public Player (String playerName, int numberOfShipPoints) {
+    public Player (String playerName, int playerMode, int [] shipLengths) {
         this.playerName = playerName;
-        this.numberOfShipPoints = numberOfShipPoints;
+        this.shipLengths = shipLengths;
+
+        for (int ship: shipLengths) {
+            numberOfShipPoints += ship;
+        }
+
+        if (playerMode == 1) {
+            this.placeShipComputer();
+        }
     }
 
     public int shoot (int [] coordinatesToShoot) {
         char characterOnField = myArea.giveField(coordinatesToShoot);
+        hitAttempts += 1;
         if (characterOnField == '#') {
             myArea.setField(coordinatesToShoot,'X');
             hitShips += 1;
@@ -30,11 +41,15 @@ public class Player {
             myArea.setField(coordinatesToShoot,'O');  // hit water
             return 2;
         } else {
-            return 0;  // Feld wurde bereits beschossen - wiederhole Eingabe
+            return 0;
         }
     }
 
-    public void placeShip (int [] coordinates, int alignment, int length ) {
+    public int computerShot () {
+        return 0;
+    }
+
+    public void placeShip (int [] coordinates, int alignment, int length) {
         // 0 = right; 1 = down;
         if (alignment == 0) {
             for (int i = coordinates[0]; i < coordinates[0] + length; i++) {
@@ -44,9 +59,57 @@ public class Player {
         } else {
             for (int i = coordinates[1]; i < coordinates[1] + length; i++) {
                 int[] field = {coordinates[0], i};
-                System.out.println(Arrays.toString(field));
                 myArea.placeShip(field);
             }
+        }
+        placedShips += length;
+    }
+
+    public void placeShipComputer () {
+        int success = 0;
+        this.myArea.initArea();
+        for (int ship: shipLengths) {
+            int counterTry = 0;
+            success = 0;
+            while (counterTry < 20) {
+                int alignment = new Random().nextInt(2);
+                int posX;
+                int posY;
+                if (alignment == 0) {
+                    posX = new Random().nextInt(10 - ship);
+                    posY = new Random().nextInt(10);
+                } else {
+                    posX = new Random().nextInt(10);
+                    posY = new Random().nextInt(10 - ship);
+                }
+                int countShips = 0;
+                for (int counter = 0; counter < ship; counter++) {
+                    int[] field = {posX, posY};
+                    if (alignment == 0) {
+                        field[0] += counter;
+                    } else {
+                        field[1] += counter;
+                    }
+                    countShips += this.countShips(field);
+                }
+                if (countShips == 0) {
+                    int [] field = {posX, posY};
+                    this.placeShip(field, alignment, ship);
+                    success = 1;
+                    break;
+                } else {
+                    counterTry++;
+                }
+            }
+            if (success == 0) {
+                break;
+            }
+        }
+        if (success == 1) {
+            this.myArea.zeigeSpielfeld();
+            placedShips = numberOfShipPoints;
+        } else {
+            this.placeShipComputer();
         }
     }
 
