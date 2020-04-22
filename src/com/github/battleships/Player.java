@@ -10,6 +10,7 @@ public class Player {
     private final int [] shipLengths;
     public int placedShips = 0;
     public int hitAttempts = 0;
+    public int lastShot = 0;
 
     public Player (String playerName, int playerMode, int [] shipLengths) {
         this.playerName = playerName;
@@ -24,24 +25,22 @@ public class Player {
         }
     }
 
-    public int shoot (int [] coordinatesToShoot) {
+    public void shoot (int [] coordinatesToShoot) {
         char characterOnField = myArea.giveField(coordinatesToShoot);
         hitAttempts += 1;
         if (characterOnField == '#') {
             myArea.setField(coordinatesToShoot,'X');
             hitShips += 1;
             if (hitShips == numberOfShipPoints) {
-                return 4;  // won game
+                lastShot = 4;  // won game
             } else if (this.countShips(coordinatesToShoot) == 0) {
-                return 3;  // a whole ship is destroyed
+                lastShot = 3;  // a whole ship is destroyed
             } else {
-                return 1;  // hit a part of the ship
+                lastShot = 2;  // hit a part of the ship
             }
         } else if (characterOnField == '~') {
-            myArea.setField(coordinatesToShoot,'O');  // hit water
-            return 2;
-        } else {
-            return 0;
+            myArea.setField(coordinatesToShoot,'O');
+            lastShot = 1;  // hit water
         }
     }
 

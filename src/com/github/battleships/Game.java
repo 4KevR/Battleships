@@ -7,12 +7,10 @@ import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
 import javafx.scene.*;
-import javafx.scene.control.Button;
-import javafx.scene.control.TextField;
+import javafx.scene.control.*;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
-import javafx.scene.control.Label;
 
 import javafx.event.EventHandler;
 
@@ -26,19 +24,18 @@ import java.awt.GraphicsEnvironment;
 
 public class Game extends Application {
     GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
-    double screenWidth = gd.getDisplayMode().getWidth()*0.6;
-    double screenHeight = gd.getDisplayMode().getHeight()*0.6;
+    double screenWidth = gd.getDisplayMode().getWidth()*0.7;
+    double screenHeight = gd.getDisplayMode().getHeight()*0.7;
 
     Stage window;
 
     VBox startGroup = new VBox();
     VBox enterNamesGroup = new VBox();
     StackPane gameGroup = new StackPane();
+    VBox waitGroup = new VBox();
+    BorderPane rootGroup = new BorderPane();
 
-    Scene startScene;
-    Scene enterNamesScene;
     Scene gameScene;
-    Scene waitScene;
 
     Label lbl;
     double opacity = 0;
@@ -66,6 +63,8 @@ public class Game extends Application {
 
     DoubleProperty mouseAreaHeight = new SimpleDoubleProperty();
 
+    CheckMenuItem checkMenuItem = new CheckMenuItem("Fullscreen");
+
     public static void main (String[] args) {
         launch();
     }
@@ -74,8 +73,22 @@ public class Game extends Application {
     public void start (Stage stage) throws Exception {
         window = stage;
         window.setMinWidth(640); window.setMinHeight(360);
-        //window.setWidth(screenWidth); window.setHeight(screenHeight);
-        //window.setFullScreen(true);
+
+        gameScene = new Scene(rootGroup, screenWidth, screenHeight);
+
+        MenuBar menuBar = new MenuBar();
+        Menu menuView = new Menu("View");
+        menuView.getItems().add(checkMenuItem);
+        checkMenuItem.setOnAction(checkEvent -> window.setFullScreen(checkMenuItem.isSelected()));
+        menuBar.getMenus().addAll(menuView);
+
+        rootGroup.setTop(menuBar);
+
+        window.setFullScreenExitHint("To disable the fullscreen, press ESC or disable it via the menu");
+        window.setResizable(false);
+        window.setTitle("Battleships!");
+        window.setScene(gameScene);
+        window.show();
 
         this.startGame();
     }
@@ -113,11 +126,7 @@ public class Game extends Application {
                     e -> button[finalI1].setEffect(null));
         }
 
-        startScene = new Scene(startGroup, screenWidth, screenHeight);
-
-        window.setTitle("Battleships!");
-        window.setScene(startScene);
-        window.show();
+        rootGroup.setCenter(startGroup);
     }
 
     private void enterNames (int playerMode) {
@@ -157,12 +166,10 @@ public class Game extends Application {
             } else {
                 players[1] = new Player("Computer", 1, shipLengths);
             }
+            rootGroup.setCenter(gameGroup);
             this.placeShips();
         });
-
-        enterNamesScene = new Scene(enterNamesGroup, startScene.getWidth(), startScene.getHeight());
-
-        window.setScene(enterNamesScene);
+        rootGroup.setCenter(enterNamesGroup);
     }
 
     private void placeShips () {
@@ -170,14 +177,14 @@ public class Game extends Application {
             //Show grid
             grid = new ResizableCanvas(0, players, actualPlayer);
             gameGroup.getChildren().add(grid);
-            grid.widthProperty().bind(gameGroup.widthProperty());
-            grid.heightProperty().bind(gameGroup.heightProperty());
+            grid.widthProperty().bind(rootGroup.widthProperty());
+            grid.heightProperty().bind(rootGroup.heightProperty());
 
             //Show placed ships
             showShips = new ResizableCanvas(2, players, actualPlayer);
             gameGroup.getChildren().add(showShips);
-            showShips.widthProperty().bind(gameGroup.widthProperty());
-            showShips.heightProperty().bind(gameGroup.heightProperty());
+            showShips.widthProperty().bind(rootGroup.widthProperty());
+            showShips.heightProperty().bind(rootGroup.heightProperty());
 
             //Display text
             HBox hb = new HBox();
@@ -193,7 +200,7 @@ public class Game extends Application {
 
             completeStep.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
             completeStep.setTranslateX(-20);
-            completeStep.setTranslateY(-10);
+            completeStep.setTranslateY(-40);
             completeStep.setVisible(false);
             completeStep.addEventHandler(MouseEvent.MOUSE_ENTERED,
                     e -> completeStep.setEffect(shadow));
@@ -204,7 +211,7 @@ public class Game extends Application {
             Button quitGame = new Button("Quit Game");
             quitGame.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
             quitGame.setTranslateX(-10);
-            quitGame.setTranslateY(-10);
+            quitGame.setTranslateY(-40);
             quitGame.addEventHandler(MouseEvent.MOUSE_ENTERED,
                     e -> quitGame.setEffect(shadow));
             quitGame.addEventHandler(MouseEvent.MOUSE_EXITED,
@@ -215,11 +222,9 @@ public class Game extends Application {
 
             gameGroup.getChildren().addAll(hb, hb2);
             gameGroup.setBackground(new Background(new BackgroundFill(Color.WHITE, CornerRadii.EMPTY, null)));
-            gameScene = new Scene(gameGroup, enterNamesScene.getWidth(), enterNamesScene.getHeight());
 
             gameScene.heightProperty().addListener(evt -> setNewPropertyHeight(gameScene.getHeight()));
-
-            window.setScene(gameScene);
+            setNewPropertyHeight(gameScene.getHeight());
 
             this.utilityPlaceShips();
 
@@ -242,9 +247,18 @@ public class Game extends Application {
                             if (cacheHitShips == players[(actualPlayer+1)%2].hitShips) {
                                 gameGroup.getChildren().remove(canvasHoverShoot);
                                 completeStep.setVisible(true);
+                                labelShipPlayer.setText(players[actualPlayer].getName() + ": Hit water!");
                             } else {
                                 cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
                                 cacheHitShips = players[(actualPlayer+1)%2].hitShips;
+                                if (players[(actualPlayer+1)%2].lastShot == 4) {
+                                    labelShipPlayer.setText(players[actualPlayer].getName() + ": Won game!");
+                                    gameGroup.getChildren().remove(canvasHoverShoot);
+                                } else if (players[(actualPlayer+1)%2].lastShot == 3) {
+                                    labelShipPlayer.setText(players[actualPlayer].getName() + ": Ship destroyed!");
+                                } else if (players[(actualPlayer+1)%2].lastShot == 2) {
+                                    labelShipPlayer.setText(players[actualPlayer].getName() + ": Hit ship!");
+                                }
                             }
                             showShips.draw(2, actualPlayer);
                         }
@@ -260,7 +274,7 @@ public class Game extends Application {
         if(actualShip != shipLengths.length) {
             canvasHoverPlaceShip = new ResizableCanvas(1, players, actualPlayer);
             gameGroup.getChildren().add(canvasHoverPlaceShip);
-            canvasHoverPlaceShip.widthProperty().bind(gameGroup.widthProperty());
+            canvasHoverPlaceShip.widthProperty().bind(rootGroup.widthProperty());
             canvasHoverPlaceShip.heightProperty().bind(mouseAreaHeight);
 
             mouseEvent = new MousePlaceShip(canvasHoverPlaceShip, shipLengths[actualShip], players[actualPlayer]);
@@ -285,13 +299,11 @@ public class Game extends Application {
 
         canvasHoverShoot = new ResizableCanvas(1, players, actualPlayer);
         gameGroup.getChildren().add(canvasHoverShoot);
-        canvasHoverShoot.widthProperty().bind(gameGroup.widthProperty());
+        canvasHoverShoot.widthProperty().bind(rootGroup.widthProperty());
         canvasHoverShoot.heightProperty().bind(mouseAreaHeight);
 
         mouseEvent = new MouseShoot(canvasHoverShoot, players[(actualPlayer+1)%2]);
         canvasHoverShoot.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
-
-        window.setScene(gameScene);
 
         cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
         cacheHitShips = players[(actualPlayer+1)%2].hitShips;
@@ -301,7 +313,7 @@ public class Game extends Application {
         if (playerMode == 1) {
             actualPlayer = (actualPlayer+1)%2;
 
-            VBox waitGroup = new VBox();
+            waitGroup = new VBox();
 
             Label label = new Label("Are you " + players[actualPlayer].getName() + "?");
 
@@ -322,16 +334,15 @@ public class Game extends Application {
             submit.setOnAction(actionEvent -> {
                 if (mode == 0) {
                     gameGroup = new StackPane();
+                    rootGroup.setCenter(gameGroup);
                     this.placeShips();
                 } else {
                     showShips.draw(2, actualPlayer);
+                    rootGroup.setCenter(gameGroup);
                     this.step();
                 }
             });
-
-            waitScene = new Scene(waitGroup, gameScene.getWidth(), gameScene.getHeight());
-
-            window.setScene(waitScene);
+            rootGroup.setCenter(waitGroup);
         } else {
             this.step();
         }
