@@ -53,6 +53,7 @@ public class Game extends Application {
     int cacheHitShips = 0;
 
     Button completeStep = new Button("Complete Step");
+    Button restartPlacement = new Button("Restart placing Ships");
 
     DropShadow shadow = new DropShadow();
 
@@ -248,7 +249,7 @@ public class Game extends Application {
             hb.getChildren().add(labelShipPlayer);
 
             HBox hb2 = new HBox();
-            hb2.setAlignment(Pos.BOTTOM_RIGHT);
+            hb2.setAlignment(Pos.BOTTOM_CENTER);
 
             completeStep.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
             completeStep.setTranslateX(-20);
@@ -260,6 +261,9 @@ public class Game extends Application {
                     e -> completeStep.setEffect(null));
             completeStep.setOnAction(actionEvent -> this.waitForNext(1));
 
+            Region between = new Region();
+            HBox.setHgrow(between, Priority.ALWAYS);
+
             Button quitGame = new Button("Quit Game");
             quitGame.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
             quitGame.setTranslateX(-10);
@@ -270,7 +274,23 @@ public class Game extends Application {
                     e -> quitGame.setEffect(null));
             quitGame.setOnAction(actionEvent -> System.exit(0));
 
-            hb2.getChildren().addAll(completeStep, quitGame);
+            restartPlacement.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+            restartPlacement.setTranslateX(10);
+            restartPlacement.setTranslateY(-40);
+            restartPlacement.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                    e -> restartPlacement.setEffect(shadow));
+            restartPlacement.addEventHandler(MouseEvent.MOUSE_EXITED,
+                    e -> restartPlacement.setEffect(null));
+            restartPlacement.setOnAction(actionEvent -> {
+                players[actualPlayer].myArea.initArea();
+                showShips.draw(2, actualPlayer);
+                actualShip = 0;
+                gameGroup.getChildren().remove(canvasHoverPlaceShip);
+                players[actualPlayer].placedShips = 0;
+                this.utilityPlaceShips();
+            });
+
+            hb2.getChildren().addAll(restartPlacement, between, completeStep, quitGame);
 
             gameGroup.getChildren().addAll(hb, hb2);
 
@@ -323,6 +343,7 @@ public class Game extends Application {
             if((actualPlayer+1)%2 == 1) {
                 this.waitForNext(0);
             } else {
+                restartPlacement.setVisible(false);
                 this.waitForNext(1);
             }
         }
@@ -387,6 +408,7 @@ public class Game extends Application {
                 labelShipPlayer.setText("Computer is playing...");
             } else {
                 firstComputerShot++;
+                restartPlacement.setVisible(false);
                 step();
             }
         }
