@@ -7,33 +7,51 @@ public class Player {
     Area myArea = new Area();
     public int hitShips = 0;
     public int numberOfShipPoints;
-    private final int [] shipLengths;
+    public final int [] shipLengths;
     public int placedShips = 0;
     public int hitAttempts = 0;
-    public int lastShot = 0;
+    public int lastShot = 1;
+    private final int [] aimed = new int[4];
 
-    public Player (String playerName, int playerMode, int [] shipLengths) {
+    public Player (String playerName, int [] shipLengths) {
         this.playerName = playerName;
         this.shipLengths = shipLengths;
 
         for (int ship: shipLengths) {
             numberOfShipPoints += ship;
         }
-
-        if (playerMode == 1) {
-            this.placeShipComputer();
-        }
     }
 
     public void shoot (int [] coordinatesToShoot) {
         char characterOnField = myArea.giveField(coordinatesToShoot);
-        hitAttempts += 1;
+        hitAttempts++;
         if (characterOnField == '#') {
             myArea.setField(coordinatesToShoot,'X');
-            hitShips += 1;
+            hitShips++;
+            int countPartsOfShip = 0;
+            int end = 0;
+            int containCharacters = 0;
+            while (end < 2) {
+                if (end == 0) {
+                    containCharacters = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "X#");
+                    if (containCharacters != 1 && containCharacters != 3) {
+                        end = 1;
+                    } else {
+                        coordinatesToShoot[(containCharacters-1)/2]++;
+                    }
+                } else {
+                    countPartsOfShip += this.countShips(coordinatesToShoot);
+                    coordinatesToShoot[(containCharacters/2)-1]--;
+                    if (coordinatesToShoot[(containCharacters/2)-1] < 0) {
+                        end = 2;
+                    } else if (myArea.giveField(coordinatesToShoot) == 'O' || myArea.giveField(coordinatesToShoot) == '~') {
+                        end = 2;
+                    }
+                }
+            }
             if (hitShips == numberOfShipPoints) {
                 lastShot = 4;  // won game
-            } else if (this.countShips(coordinatesToShoot) == 0) {
+            } else if (countPartsOfShip == 0) {
                 lastShot = 3;  // a whole ship is destroyed
             } else {
                 lastShot = 2;  // hit a part of the ship
@@ -44,8 +62,69 @@ public class Player {
         }
     }
 
-    public int computerShot () {
-        return 0;
+    public void computerShot (int difficulty) {
+        int [] coordinatesToShoot = new int[2];
+        if (difficulty == 0) {
+            coordinatesToShoot[0] = new Random().nextInt(10);
+            coordinatesToShoot[1] = new Random().nextInt(10);
+        } else if (difficulty >= 1 && difficulty <= 3) {
+            if ((lastShot == 1 && aimed[2] == 0) || lastShot == 3) {
+                if (new Random().nextFloat() < 0.14*difficulty) {
+                    coordinatesToShoot = myArea.getFieldWithChar('#');
+                    aimed[0] = coordinatesToShoot[0]; aimed[1] = coordinatesToShoot[1];
+                    aimed[2] = 1; aimed[3] = 0;
+                } else {
+                    coordinatesToShoot = myArea.getFieldWithChar('~');
+                    aimed[2] = 0;
+                }
+            } else if (lastShot == 2 || aimed[2] == 1) {
+                coordinatesToShoot[0] = aimed[0]; coordinatesToShoot[1] = aimed[1];
+                if (aimed[3] == 0) {
+                    int set;
+                    if (new Random().nextFloat() < 0.20*difficulty) {
+                        set = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "#");
+                        aimed[3] = set;
+                    } else {
+                        set = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "~");
+                        if (set == 0) {
+                            set = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "#");
+                        }
+                    }
+                    myArea.applyNumberPos(coordinatesToShoot, set);
+                } else {
+                    myArea.applyNumberPos(coordinatesToShoot, aimed[3]);
+                    if (myArea.giveField(coordinatesToShoot) == '~') {
+                        if (aimed[3]%2 == 0) {
+                            aimed[3]--;
+                        } else {
+                            aimed[3]++;
+                        }
+                    }
+                }
+                if (myArea.giveField(coordinatesToShoot) != '~') {
+                    aimed[0] = coordinatesToShoot[0];
+                    aimed[1] = coordinatesToShoot[1];
+                }
+            }
+        } else {
+            if (lastShot == 1 || (difficulty == 5 && lastShot == 3)) {
+                coordinatesToShoot = myArea.getFieldWithChar('#');
+            } else if (lastShot == 2 || difficulty == 5) {
+                int set = 0;
+                while (set == 0) {
+                    coordinatesToShoot = myArea.getFieldWithChar('#');
+                    set = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "X");
+                }
+            } else {
+                coordinatesToShoot = myArea.getFieldWithChar('~');
+            }
+        }
+        char characterOnField = myArea.giveField(coordinatesToShoot);
+        if (characterOnField != 'X' && characterOnField != 'O') {
+            this.shoot(coordinatesToShoot);
+        } else {
+            this.computerShot(difficulty);
+        }
     }
 
     public void placeShip (int [] coordinates, int alignment, int length) {
@@ -62,54 +141,6 @@ public class Player {
             }
         }
         placedShips += length;
-    }
-
-    public void placeShipComputer () {
-        int success = 0;
-        this.myArea.initArea();
-        for (int ship: shipLengths) {
-            int counterTry = 0;
-            success = 0;
-            while (counterTry < 20) {
-                int alignment = new Random().nextInt(2);
-                int posX;
-                int posY;
-                if (alignment == 0) {
-                    posX = new Random().nextInt(10 - ship);
-                    posY = new Random().nextInt(10);
-                } else {
-                    posX = new Random().nextInt(10);
-                    posY = new Random().nextInt(10 - ship);
-                }
-                int countShips = 0;
-                for (int counter = 0; counter < ship; counter++) {
-                    int[] field = {posX, posY};
-                    if (alignment == 0) {
-                        field[0] += counter;
-                    } else {
-                        field[1] += counter;
-                    }
-                    countShips += this.countShips(field);
-                }
-                if (countShips == 0) {
-                    int [] field = {posX, posY};
-                    this.placeShip(field, alignment, ship);
-                    success = 1;
-                    break;
-                } else {
-                    counterTry++;
-                }
-            }
-            if (success == 0) {
-                break;
-            }
-        }
-        if (success == 1) {
-            this.myArea.zeigeSpielfeld();
-            placedShips = numberOfShipPoints;
-        } else {
-            this.placeShipComputer();
-        }
     }
 
     public int countShips (int [] coordinates) {

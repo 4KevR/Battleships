@@ -17,6 +17,7 @@ import javafx.event.EventHandler;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
+import javafx.util.StringConverter;
 
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
@@ -63,6 +64,8 @@ public class Game extends Application {
 
     DoubleProperty mouseAreaHeight = new SimpleDoubleProperty();
 
+    int firstComputerShot = 0;
+
     public static void main (String[] args) {
         launch();
     }
@@ -100,7 +103,6 @@ public class Game extends Application {
         window.setTitle("Battleships!");
         window.setScene(gameScene);
         window.show();
-
         this.startGame();
     }
 
@@ -141,27 +143,68 @@ public class Game extends Application {
 
     private void enterNames (int playerMode) {
         this.playerMode = playerMode;
+
+        enterNamesGroup.setAlignment(Pos.CENTER);
+        enterNamesGroup.setSpacing(20);
+
+        Button submitNames = new Button("Submit");
+        submitNames.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+
         HBox hb = new HBox();
         hb.setAlignment(Pos.CENTER);
+        hb.setSpacing(10);
 
         Label label1 = new Label("Name Player 1:");
         TextField textField1 = new TextField ();
         hb.getChildren().addAll(label1, textField1);
 
         TextField textField2 = new TextField();
+        Slider slider = new Slider(0,5,0);
         if (playerMode == 1) {
             Label label2 = new Label("Name Player 2:");
             hb.getChildren().addAll(label2, textField2);
+            enterNamesGroup.getChildren().addAll(hb, submitNames);
+        } else {
+            slider.setMin(0); slider.setMax(5);
+            slider.setValue(1);
+            slider.setMinorTickCount(0); slider.setMajorTickUnit(1);
+            slider.setSnapToTicks(true); slider.setShowTickMarks(true); slider.setShowTickLabels(true);
+            slider.setMaxWidth(screenWidth*0.5);
+            slider.setLabelFormatter(new StringConverter<>() {
+                @Override
+                public String toString(Double n) {
+                    if (n < 0.5) return "extremely easy";
+                    if (n < 1.5) return "easy";
+                    if (n < 2.5) return "normal";
+                    if (n < 3.5) return "hard";
+                    if (n < 4.5) return "very hard";
+
+                    return "(almost) impossible";
+                }
+
+                @Override
+                public Double fromString(String s) {
+                    switch (s) {
+                        case "extremely easy":
+                            return 0d;
+                        case "easy":
+                            return 1d;
+                        case "normal":
+                            return 2d;
+                        case "hard":
+                            return 3d;
+                        case "very hard":
+                            return 4d;
+                        case "impossible":
+                            return 5d;
+
+                        default:
+                            return -1d;
+                    }
+                }
+            });
+            enterNamesGroup.getChildren().addAll(hb, slider, submitNames);
         }
-
-        hb.setSpacing(10);
-
-        Button submitNames = new Button("Submit");
-        submitNames.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
-
-        enterNamesGroup.setAlignment(Pos.CENTER);
-        enterNamesGroup.setSpacing(20);
-        enterNamesGroup.getChildren().addAll(hb, submitNames);
 
         submitNames.addEventHandler(MouseEvent.MOUSE_ENTERED,
                 e -> submitNames.setEffect(shadow));
@@ -169,11 +212,11 @@ public class Game extends Application {
                 e -> submitNames.setEffect(null));
 
         submitNames.setOnAction(actionEvent ->  {
-            players[0] = new Player(textField1.getText(), 0, shipLengths);
+            players[0] = new Player(textField1.getText(), shipLengths);
             if (playerMode == 1) {
-                players[1] = new Player(textField2.getText(), 0, shipLengths);
+                players[1] = new Player(textField2.getText(), shipLengths);
             } else {
-                players[1] = new Player("Computer", 1, shipLengths);
+                players[1] = new ComputerPlayer(shipLengths, (int) slider.getValue());
             }
             rootGroup.setCenter(gameGroup);
             this.placeShips();
@@ -252,23 +295,8 @@ public class Game extends Application {
                     } else {
                         //shooting
                         if (cacheHitAttempts != players[(actualPlayer+1)%2].hitAttempts) {
-                            if (cacheHitShips == players[(actualPlayer+1)%2].hitShips) {
-                                gameGroup.getChildren().remove(canvasHoverShoot);
-                                completeStep.setVisible(true);
-                                labelShipPlayer.setText(players[actualPlayer].getName() + ": Hit water!");
-                            } else {
-                                cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
-                                cacheHitShips = players[(actualPlayer+1)%2].hitShips;
-                                if (players[(actualPlayer+1)%2].lastShot == 4) {
-                                    labelShipPlayer.setText(players[actualPlayer].getName() + ": Won game!");
-                                    gameGroup.getChildren().remove(canvasHoverShoot);
-                                } else if (players[(actualPlayer+1)%2].lastShot == 3) {
-                                    labelShipPlayer.setText(players[actualPlayer].getName() + ": Ship destroyed!");
-                                } else if (players[(actualPlayer+1)%2].lastShot == 2) {
-                                    labelShipPlayer.setText(players[actualPlayer].getName() + ": Hit ship!");
-                                }
-                            }
-                            showShips.draw(2, actualPlayer);
+                            cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
+                            this.processShot();
                         }
                     }
                 }
@@ -351,8 +379,42 @@ public class Game extends Application {
             });
             rootGroup.setCenter(waitGroup);
         } else {
-            this.step();
+            if (firstComputerShot != 0) {
+                completeStep.setVisible(false);
+                actualPlayer = 1;
+                AnimationTimer computerShot = new animateComputerShot();
+                computerShot.start();
+                labelShipPlayer.setText("Computer is playing...");
+            } else {
+                firstComputerShot++;
+                step();
+            }
         }
+    }
+
+    private int processShot () {
+        if (playerMode == 0 && actualPlayer == 1) {
+            showShips.draw(2, 0);
+        } else {
+            showShips.draw(2, actualPlayer);
+        }
+        if (players[(actualPlayer+1)%2].lastShot == 4) {
+            labelShipPlayer.setText(players[actualPlayer].getName()+": Won game!");
+            gameGroup.getChildren().remove(canvasHoverShoot);
+            return 2;
+        } else if (players[(actualPlayer+1)%2].lastShot == 3) {
+            labelShipPlayer.setText(players[actualPlayer].getName()+": Ship destroyed!");
+        } else if (players[(actualPlayer+1)%2].lastShot == 2) {
+            labelShipPlayer.setText(players[actualPlayer].getName()+": Hit ship!");
+        } else {
+            if (playerMode == 1 || (playerMode == 0 && actualPlayer == 0)) {
+                gameGroup.getChildren().remove(canvasHoverShoot);
+                completeStep.setVisible(true);
+            }
+            labelShipPlayer.setText(players[actualPlayer].getName()+": Hit water!");
+            return 1;
+        }
+        return 0;
     }
 
     private class fadeIn extends AnimationTimer {
@@ -362,6 +424,28 @@ public class Game extends Application {
             lbl.opacityProperty().set(opacity);
             if (opacity >= 1) {
                 stop();
+            }
+        }
+    }
+
+    private class animateComputerShot extends AnimationTimer {
+        int timer = 0;
+        int end = 0;
+        @Override
+        public void handle (long now) {
+            timer++;
+            if (timer == 50) {
+                if (end == 0) {
+                    timer = 0;
+                    players[0].computerShot(((ComputerPlayer)players[1]).difficulty);
+                    end = processShot();
+                } else {
+                    if (end == 1) {
+                        actualPlayer = 0;
+                        step();
+                    }
+                    stop();
+                }
             }
         }
     }
