@@ -3,15 +3,17 @@ package com.github.battleships;
 import java.util.Random;
 
 public class Player {
-    private final String playerName;
+    private String playerName;
     Area myArea = new Area();
     public int hitShips = 0;
     public int numberOfShipPoints;
-    public final int [] shipLengths;
+    public int [] shipLengths;
     public int placedShips = 0;
     public int hitAttempts = 0;
     public int lastShot = 1;
     private final int [] aimed = new int[4];
+
+    public Player () {}
 
     public Player (String playerName, int [] shipLengths) {
         this.playerName = playerName;
@@ -69,7 +71,7 @@ public class Player {
             coordinatesToShoot[1] = new Random().nextInt(10);
         } else if (difficulty >= 1 && difficulty <= 3) {
             if ((lastShot == 1 && aimed[2] == 0) || lastShot == 3) {
-                if (new Random().nextFloat() < 0.14*difficulty) {
+                if (new Random().nextFloat() < 0.18*difficulty) {
                     coordinatesToShoot = myArea.getFieldWithChar('#');
                     aimed[0] = coordinatesToShoot[0]; aimed[1] = coordinatesToShoot[1];
                     aimed[2] = 1; aimed[3] = 0;
@@ -88,6 +90,7 @@ public class Player {
                         set = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "~");
                         if (set == 0) {
                             set = myArea.nearbyFieldsContainCharacter(coordinatesToShoot, "#");
+                            aimed[3] = set;
                         }
                     }
                     myArea.applyNumberPos(coordinatesToShoot, set);

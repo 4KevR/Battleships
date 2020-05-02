@@ -3,6 +3,7 @@ package com.github.battleships;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 
+import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.geometry.Pos;
@@ -21,12 +22,17 @@ import javafx.util.StringConverter;
 
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.UnknownHostException;
 
 
 public class Game extends Application {
     GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
     double screenWidth = gd.getDisplayMode().getWidth()*0.7;
     double screenHeight = gd.getDisplayMode().getHeight()*0.7;
+    DoubleProperty mouseAreaHeight = new SimpleDoubleProperty();
 
     Stage window;
 
@@ -46,14 +52,14 @@ public class Game extends Application {
 
     int [] shipLengths = {5, 4 ,4, 3, 3, 3, 2, 2, 2, 2};
     int actualShip = 0;
-    Label labelShipPlayer = new Label();
-
-    Player [] players = new Player[2];
-    int cacheHitAttempts = 0;
-    int cacheHitShips = 0;
-
     Button completeStep = new Button("Complete Step");
     Button restartPlacement = new Button("Restart placing Ships");
+
+    Player [] players = new Player[2];
+    Label labelShipPlayer = new Label();
+    int firstComputerShot = 0;
+    int cacheHitAttempts = 0;
+    int cacheHitShips = 0;
 
     DropShadow shadow = new DropShadow();
 
@@ -63,9 +69,8 @@ public class Game extends Application {
     ResizableCanvas showShips;
     EventHandler<MouseEvent> mouseEvent;
 
-    DoubleProperty mouseAreaHeight = new SimpleDoubleProperty();
-
-    int firstComputerShot = 0;
+    ServerSocket serverSocket;
+    Socket clientSocket;
 
     public static void main (String[] args) {
         launch();
@@ -151,20 +156,62 @@ public class Game extends Application {
         Button submitNames = new Button("Submit");
         submitNames.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
 
-        HBox hb = new HBox();
-        hb.setAlignment(Pos.CENTER);
-        hb.setSpacing(10);
+        VBox vbNames = new VBox();
+        vbNames.setAlignment(Pos.CENTER);
+        vbNames.setSpacing(10);
+
+        HBox hbName1 = new HBox(); hbName1.setAlignment(Pos.CENTER); hbName1.setSpacing(5);
+        HBox hbName2 = new HBox(); hbName2.setAlignment(Pos.CENTER); hbName2.setSpacing(5);
 
         Label label1 = new Label("Name Player 1:");
         TextField textField1 = new TextField ();
-        hb.getChildren().addAll(label1, textField1);
+        hbName1.getChildren().addAll(label1, textField1);
+        vbNames.getChildren().add(hbName1);
 
         TextField textField2 = new TextField();
         Slider slider = new Slider(0,5,0);
         if (playerMode == 1) {
             Label label2 = new Label("Name Player 2:");
-            hb.getChildren().addAll(label2, textField2);
-            enterNamesGroup.getChildren().addAll(hb, submitNames);
+            hbName2.getChildren().addAll(label2, textField2);
+            vbNames.getChildren().add(hbName2);
+
+            final ToggleGroup toggleGroup = new ToggleGroup();
+            HBox hbToggleButtons = new HBox();
+
+            ToggleButton tb1 = new ToggleButton("Local game");
+            tb1.setToggleGroup(toggleGroup);
+            tb1.setSelected(true);
+            tb1.setUserData(0);
+
+            ToggleButton tb2 = new ToggleButton("Create game (local Network)");
+            tb2.setToggleGroup(toggleGroup);
+            tb2.setUserData(1);
+
+            ToggleButton tb3 = new ToggleButton("Enter to game (local Network)");
+            tb3.setToggleGroup(toggleGroup);
+            tb3.setUserData(2);
+
+            toggleGroup.selectedToggleProperty().addListener((ov, toggle, new_toggle) -> {
+                if (new_toggle != null) {
+                    int userData = (int) toggleGroup.getSelectedToggle().getUserData();
+                    if (userData == 0) {
+                        label2.setText("Name Player 2:");
+                        this.playerMode = 1;
+                    } else if (userData == 1) {
+                        label2.setText("Port:");
+                        this.playerMode = 2;
+                    } else {
+                        label2.setText("Server:");
+                        this.playerMode = 3;
+                    }
+                }
+            });
+
+            hbToggleButtons.getChildren().addAll(tb1, tb2, tb3);
+            hbToggleButtons.setSpacing(5);
+            hbToggleButtons.setAlignment(Pos.CENTER);
+
+            enterNamesGroup.getChildren().addAll(vbNames, hbToggleButtons, submitNames);
         } else {
             slider.setMin(0); slider.setMax(5);
             slider.setValue(1);
@@ -204,7 +251,7 @@ public class Game extends Application {
                     }
                 }
             });
-            enterNamesGroup.getChildren().addAll(hb, slider, submitNames);
+            enterNamesGroup.getChildren().addAll(vbNames, slider, submitNames);
         }
 
         submitNames.addEventHandler(MouseEvent.MOUSE_ENTERED,
@@ -213,14 +260,54 @@ public class Game extends Application {
                 e -> submitNames.setEffect(null));
 
         submitNames.setOnAction(actionEvent ->  {
+            System.out.println(this.playerMode);
             players[0] = new Player(textField1.getText(), shipLengths);
-            if (playerMode == 1) {
-                players[1] = new Player(textField2.getText(), shipLengths);
-            } else {
+            if (this.playerMode == 0) {
                 players[1] = new ComputerPlayer(shipLengths, (int) slider.getValue());
+            } else if (this.playerMode == 1) {
+                players[1] = new Player(textField2.getText(), shipLengths);
+            } else if (this.playerMode == 2) {
+                try {
+                    System.out.println("Server mode");
+                    Label wait = new Label("Waiting for the connection of the client...");
+                    gameGroup.getChildren().add(wait);
+                    serverSocket = new ServerSocket(Integer.parseInt(textField2.getText()));
+                    Runnable runnable = () -> {
+                        try {
+                            clientSocket = serverSocket.accept();
+                            players[1] = new RemotePlayer(0, clientSocket, players[0].getName());
+                            System.out.println("Connection established");
+                            Platform.runLater(() -> {
+                                gameGroup.getChildren().remove(wait);
+                                this.placeShips();
+                            });
+                        } catch (IOException e) {
+                            System.exit(-1);
+                        }
+                    };
+                    Thread acceptThread = new Thread(runnable);
+                    acceptThread.start();
+                } catch (IOException e) {
+                    System.out.println("Could not listen on specified port");
+                    System.exit(-1);
+                }
+            } else {
+                String [] address = textField2.getText().split(":");
+                try {
+                    clientSocket = new Socket(address[0], Integer.parseInt(address[1]));
+                    players[1] = new RemotePlayer(1, clientSocket, players[0].getName());
+                } catch (UnknownHostException e) {
+                    System.err.println("Host is not reachable");
+                    System.exit(-1);
+                } catch (IOException e) {
+                    System.err.println("Couldn't get I/O for the connection.");
+                    System.exit(-1);
+                }
             }
             rootGroup.setCenter(gameGroup);
-            this.placeShips();
+            if (this.playerMode != 2) {
+                this.placeShips();
+            }
         });
         rootGroup.setCenter(enterNamesGroup);
     }
@@ -333,7 +420,7 @@ public class Game extends Application {
             canvasHoverPlaceShip.widthProperty().bind(rootGroup.widthProperty());
             canvasHoverPlaceShip.heightProperty().bind(mouseAreaHeight);
 
-            mouseEvent = new MousePlaceShip(canvasHoverPlaceShip, shipLengths[actualShip], players[actualPlayer]);
+            mouseEvent = new MousePlaceHandler(0, canvasHoverPlaceShip, shipLengths[actualShip], players[actualPlayer]);
             canvasHoverPlaceShip.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
 
             actualShip += 1;
@@ -359,7 +446,7 @@ public class Game extends Application {
         canvasHoverShoot.widthProperty().bind(rootGroup.widthProperty());
         canvasHoverShoot.heightProperty().bind(mouseAreaHeight);
 
-        mouseEvent = new MouseShoot(canvasHoverShoot, players[(actualPlayer+1)%2]);
+        mouseEvent = new MousePlaceHandler(1, canvasHoverShoot, players[(actualPlayer+1)%2]);
         canvasHoverShoot.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
 
         cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
