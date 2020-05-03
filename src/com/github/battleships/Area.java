@@ -67,7 +67,7 @@ public class Area {
         }
     }
 
-    public void showArea() {
+    public void showArea () {
         System.out.println("  1 2 3 4 5 6 7 8 9 10");
         for (int i=0;i<this.area.length;i++) {
             int  asciiNumber    = 65+i;

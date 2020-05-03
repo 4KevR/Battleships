@@ -57,7 +57,7 @@ public class Game extends Application {
 
     Player [] players = new Player[2];
     Label labelShipPlayer = new Label();
-    int firstComputerShot = 0;
+    int firstShot = 0;
     int cacheHitAttempts = 0;
     int cacheHitShips = 0;
 
@@ -71,6 +71,8 @@ public class Game extends Application {
 
     ServerSocket serverSocket;
     Socket clientSocket;
+
+    Thread thSyncPlacingShips;
 
     public static void main (String[] args) {
         launch();
@@ -260,7 +262,6 @@ public class Game extends Application {
                 e -> submitNames.setEffect(null));
 
         submitNames.setOnAction(actionEvent ->  {
-            System.out.println(this.playerMode);
             players[0] = new Player(textField1.getText(), shipLengths);
             if (this.playerMode == 0) {
                 players[1] = new ComputerPlayer(shipLengths, (int) slider.getValue());
@@ -268,7 +269,6 @@ public class Game extends Application {
                 players[1] = new Player(textField2.getText(), shipLengths);
             } else if (this.playerMode == 2) {
                 try {
-                    System.out.println("Server mode");
                     Label wait = new Label("Waiting for the connection of the client...");
                     gameGroup.getChildren().add(wait);
                     serverSocket = new ServerSocket(Integer.parseInt(textField2.getText()));
@@ -276,7 +276,6 @@ public class Game extends Application {
                         try {
                             clientSocket = serverSocket.accept();
                             players[1] = new RemotePlayer(0, clientSocket, players[0].getName());
-                            System.out.println("Connection established");
                             Platform.runLater(() -> {
                                 gameGroup.getChildren().remove(wait);
                                 this.placeShips();
@@ -288,7 +287,7 @@ public class Game extends Application {
                     Thread acceptThread = new Thread(runnable);
                     acceptThread.start();
                 } catch (IOException e) {
-                    System.out.println("Could not listen on specified port");
+                    System.err.println("Could not listen on specified port");
                     System.exit(-1);
                 }
             } else {
@@ -314,6 +313,18 @@ public class Game extends Application {
 
     private void placeShips () {
         if (playerMode == 1 || actualPlayer == 0) {
+            if (playerMode == 2 || playerMode == 3) {
+                Runnable syncPlacingShips;
+                syncPlacingShips = () -> {
+                    try {
+                        ((RemotePlayer) players[1]).syncPlacingShips();
+                        Platform.runLater(() -> this.waitForNext(0));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                };
+                thSyncPlacingShips = new Thread(syncPlacingShips);
+            }
             //Show grid
             grid = new ResizableCanvas(0, players, actualPlayer);
             gameGroup.getChildren().add(grid);
@@ -428,7 +439,12 @@ public class Game extends Application {
             actualShip = 0;
 
             if((actualPlayer+1)%2 == 1) {
-                this.waitForNext(0);
+                if (playerMode != 2 && playerMode != 3) {
+                    this.waitForNext(0);
+                } else {
+                    thSyncPlacingShips.start();
+                    labelShipPlayer.setText("Waiting for "+((RemotePlayer)players[1]).getPlayerName()+" to be ready...");
+                }
             } else {
                 restartPlacement.setVisible(false);
                 this.waitForNext(1);
@@ -449,8 +465,10 @@ public class Game extends Application {
         mouseEvent = new MousePlaceHandler(1, canvasHoverShoot, players[(actualPlayer+1)%2]);
         canvasHoverShoot.addEventHandler(MouseEvent.MOUSE_MOVED, mouseEvent);
 
-        cacheHitAttempts = players[(actualPlayer+1)%2].hitAttempts;
-        cacheHitShips = players[(actualPlayer+1)%2].hitShips;
+        if (playerMode < 2) {
+            cacheHitAttempts = players[(actualPlayer + 1) % 2].hitAttempts;
+            cacheHitShips = players[(actualPlayer + 1) % 2].hitShips;
+        }
     }
 
     private void waitForNext (int mode) {
@@ -487,17 +505,61 @@ public class Game extends Application {
             });
             rootGroup.setCenter(waitGroup);
         } else {
-            if (firstComputerShot != 0) {
+            if (firstShot != 0 && playerMode == 0) {
                 completeStep.setVisible(false);
                 actualPlayer = 1;
                 AnimationTimer computerShot = new animateComputerShot();
                 computerShot.start();
                 labelShipPlayer.setText("Computer is playing...");
+            } else if (firstShot != 0) {
+                ((RemotePlayer) players[1]).confirm();
+                this.handleNetworkAttack();
             } else {
-                firstComputerShot++;
+                firstShot++;
                 restartPlacement.setVisible(false);
-                step();
+                if (playerMode == 2) {
+                    step();
+                } else {
+                    this.handleNetworkAttack();
+                }
             }
+        }
+    }
+
+    private void handleNetworkAttack () {
+        completeStep.setVisible(false);
+        labelShipPlayer.setText(((RemotePlayer)players[1]).getPlayerName()+" is attacking...");
+        Runnable networkAttack = () -> {
+            try {
+                int [] coordinatesToShoot = ((RemotePlayer) players[1]).receiveAttack();
+                players[0].shoot(coordinatesToShoot);
+                ((RemotePlayer) players[1]).sendResult(players[0].lastShot);
+                Platform.runLater(this::handleNetworkAttackResume);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        };
+        Thread thNetworkAttack = new Thread(networkAttack);
+        thNetworkAttack.start();
+    }
+
+    private void handleNetworkAttackResume () {
+        showShips.draw(2, 0);
+        if (players[0].lastShot == 1) {
+            Runnable confirmation = () -> {
+                try {
+                    ((RemotePlayer) players[1]).waitForConfirmation();
+                    Platform.runLater(this::step);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            };
+            Thread thConfirmation = new Thread(confirmation);
+            thConfirmation.start();
+        } else if (players[0].lastShot == 2 || players[0].lastShot == 3) {
+            handleNetworkAttack();
+        } else {
+            labelShipPlayer.setText(((RemotePlayer)players[1]).getPlayerName()+" has won the game!");
         }
     }
 
@@ -507,16 +569,23 @@ public class Game extends Application {
         } else {
             showShips.draw(2, actualPlayer);
         }
-        if (players[(actualPlayer+1)%2].lastShot == 4) {
+
+        int lastShot;
+        if (playerMode < 2) {
+            lastShot = players[(actualPlayer+1)%2].lastShot;
+        } else {
+            lastShot = ((RemotePlayer)players[1]).lastShot;
+        }
+        if (lastShot == 4) {
             labelShipPlayer.setText(players[actualPlayer].getName()+": Won game!");
             gameGroup.getChildren().remove(canvasHoverShoot);
             return 2;
-        } else if (players[(actualPlayer+1)%2].lastShot == 3) {
+        } else if (lastShot == 3) {
             labelShipPlayer.setText(players[actualPlayer].getName()+": Ship destroyed!");
-        } else if (players[(actualPlayer+1)%2].lastShot == 2) {
+        } else if (lastShot == 2) {
             labelShipPlayer.setText(players[actualPlayer].getName()+": Hit ship!");
         } else {
-            if (playerMode == 1 || (playerMode == 0 && actualPlayer == 0)) {
+            if (playerMode == 1 || (playerMode == 0 && actualPlayer == 0) || playerMode >= 2) {
                 gameGroup.getChildren().remove(canvasHoverShoot);
                 completeStep.setVisible(true);
             }
@@ -546,7 +615,11 @@ public class Game extends Application {
             if (timer == 50) {
                 if (end == 0) {
                     timer = 0;
-                    players[0].computerShot(((ComputerPlayer)players[1]).difficulty);
+                    try {
+                        players[0].computerShot(((ComputerPlayer)players[1]).difficulty);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
                     end = processShot();
                 } else {
                     if (end == 1) {

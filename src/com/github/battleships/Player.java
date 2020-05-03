@@ -1,5 +1,6 @@
 package com.github.battleships;
 
+import java.io.IOException;
 import java.util.Random;
 
 public class Player {
@@ -24,7 +25,7 @@ public class Player {
         }
     }
 
-    public void shoot (int [] coordinatesToShoot) {
+    public void shoot (int [] coordinatesToShoot) throws IOException {
         char characterOnField = myArea.giveField(coordinatesToShoot);
         hitAttempts++;
         if (characterOnField == '#') {
@@ -64,7 +65,7 @@ public class Player {
         }
     }
 
-    public void computerShot (int difficulty) {
+    public void computerShot (int difficulty) throws IOException {
         int [] coordinatesToShoot = new int[2];
         if (difficulty == 0) {
             coordinatesToShoot[0] = new Random().nextInt(10);

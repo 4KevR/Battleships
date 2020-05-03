@@ -5,6 +5,8 @@ import javafx.scene.input.*;
 import javafx.scene.canvas.*;
 import javafx.scene.paint.Color;
 
+import java.io.IOException;
+
 
 public class MousePlaceHandler implements EventHandler<MouseEvent> {
     int mode;
@@ -45,7 +47,19 @@ public class MousePlaceHandler implements EventHandler<MouseEvent> {
             if (mouseEvent.getButton() == MouseButton.PRIMARY && valuePos == 1) {
                 hover.clearRect(0, 0, this.canvasHover.getWidth(), this.canvasHover.getHeight());
                 valuePos = 0;
-                this.player.shoot(pos);
+                if (this.player instanceof RemotePlayer) {
+                    try {
+                        this.player.shoot(pos);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    try {
+                        this.player.shoot(pos);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         });
     }
