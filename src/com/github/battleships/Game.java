@@ -23,6 +23,8 @@ import javafx.util.StringConverter;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -54,6 +56,7 @@ public class Game extends Application {
     int actualShip = 0;
     Button completeStep = new Button("Complete Step");
     Button restartPlacement = new Button("Restart placing Ships");
+    Button returnMenu = new Button("Return to Menu");
 
     Player [] players = new Player[2];
     Label labelShipPlayer = new Label();
@@ -73,6 +76,8 @@ public class Game extends Application {
     Socket clientSocket;
 
     Thread thSyncPlacingShips;
+
+    int error = 0;
 
     public static void main (String[] args) {
         launch();
@@ -111,6 +116,9 @@ public class Game extends Application {
         window.setTitle("Battleships!");
         window.setScene(gameScene);
         window.show();
+
+        Thread.setDefaultUncaughtExceptionHandler(Game::handleError);
+
         this.startGame();
     }
 
@@ -145,6 +153,8 @@ public class Game extends Application {
             button[i].addEventHandler(MouseEvent.MOUSE_EXITED,
                     e -> button[finalI1].setEffect(null));
         }
+
+        Thread.setDefaultUncaughtExceptionHandler(Game::handleError);
 
         rootGroup.setCenter(startGroup);
     }
@@ -281,31 +291,34 @@ public class Game extends Application {
                                 this.placeShips();
                             });
                         } catch (IOException e) {
-                            System.exit(-1);
+                            Platform.runLater(() -> this.createErrorDialog("It happened an IOException Error"));
                         }
                     };
                     Thread acceptThread = new Thread(runnable);
                     acceptThread.start();
                 } catch (IOException e) {
-                    System.err.println("Could not listen on specified port");
-                    System.exit(-1);
+                    this.createErrorDialog("Could not listen on specified port");
+                } catch (IllegalArgumentException e) {
+                    this.createErrorDialog("Illegal Argument");
                 }
             } else {
-                String [] address = textField2.getText().split(":");
+                String[] address = textField2.getText().split(":");
                 try {
                     clientSocket = new Socket(address[0], Integer.parseInt(address[1]));
                     players[1] = new RemotePlayer(1, clientSocket, players[0].getName());
                 } catch (UnknownHostException e) {
-                    System.err.println("Host is not reachable");
-                    System.exit(-1);
+                    this.createErrorDialog("Host is not reachable");
                 } catch (IOException e) {
-                    System.err.println("Couldn't get I/O for the connection.");
-                    System.exit(-1);
+                    this.createErrorDialog("Couldn't get I/O for the connection");
                 }
             }
-            rootGroup.setCenter(gameGroup);
-            if (this.playerMode != 2) {
-                this.placeShips();
+            if (error != 1) {
+                rootGroup.setCenter(gameGroup);
+                if (this.playerMode != 2) {
+                    this.placeShips();
+                }
+            } else {
+                error = 0;
             }
         });
         rootGroup.setCenter(enterNamesGroup);
@@ -350,7 +363,7 @@ public class Game extends Application {
             hb2.setAlignment(Pos.BOTTOM_CENTER);
 
             completeStep.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
-            completeStep.setTranslateX(-20);
+            completeStep.setTranslateX(-30);
             completeStep.setTranslateY(-40);
             completeStep.setVisible(false);
             completeStep.addEventHandler(MouseEvent.MOUSE_ENTERED,
@@ -388,7 +401,16 @@ public class Game extends Application {
                 this.utilityPlaceShips();
             });
 
-            hb2.getChildren().addAll(restartPlacement, between, completeStep, quitGame);
+            returnMenu.setStyle("-fx-font: 22 arial; -fx-base: #b6e7c9;");
+            returnMenu.setTranslateX(-20);
+            returnMenu.setTranslateY(-40);
+            returnMenu.addEventHandler(MouseEvent.MOUSE_ENTERED,
+                    e -> returnMenu.setEffect(shadow));
+            returnMenu.addEventHandler(MouseEvent.MOUSE_EXITED,
+                    e -> returnMenu.setEffect(null));
+            returnMenu.setOnAction(actionEvent -> this.returnToMainMenu());
+
+            hb2.getChildren().addAll(restartPlacement, between, completeStep, returnMenu, quitGame);
 
             gameGroup.getChildren().addAll(hb, hb2);
 
@@ -510,6 +532,7 @@ public class Game extends Application {
                 actualPlayer = 1;
                 AnimationTimer computerShot = new animateComputerShot();
                 computerShot.start();
+                returnMenu.setDisable(true);
                 labelShipPlayer.setText("Computer is playing...");
             } else if (firstShot != 0) {
                 ((RemotePlayer) players[1]).confirm();
@@ -517,7 +540,7 @@ public class Game extends Application {
             } else {
                 firstShot++;
                 restartPlacement.setVisible(false);
-                if (playerMode == 2) {
+                if (playerMode <= 2) {
                     step();
                 } else {
                     this.handleNetworkAttack();
@@ -595,14 +618,85 @@ public class Game extends Application {
         return 0;
     }
 
+    public void createErrorDialog (String errorMessage) {
+        error = 1;
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Error");
+        alert.setHeaderText("An error occurred");
+        alert.setContentText(errorMessage);
+
+        alert.showAndWait();
+
+        returnToMainMenu();
+    }
+
+    public static void handleError(Thread t, Throwable e) {
+        if (Platform.isFxApplicationThread()) {
+            showExceptionError(e);
+        } else {
+            System.err.println("An unexpected error occurred in "+t);
+        }
+    }
+
+    public static void showExceptionError(Throwable e) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Exception Dialog");
+        alert.setHeaderText("An error occurred");
+        alert.setContentText("Further information in the details...");
+
+        // Create expandable Exception.
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        e.printStackTrace(pw);
+        String exceptionText = sw.toString();
+
+        Label label = new Label("The exception stacktrace was:");
+
+        TextArea textArea = new TextArea(exceptionText);
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+
+        textArea.setMaxWidth(Double.MAX_VALUE);
+        textArea.setMaxHeight(Double.MAX_VALUE);
+        GridPane.setVgrow(textArea, Priority.ALWAYS);
+        GridPane.setHgrow(textArea, Priority.ALWAYS);
+
+        GridPane expContent = new GridPane();
+        expContent.setMaxWidth(Double.MAX_VALUE);
+        expContent.add(label, 0, 0);
+        expContent.add(textArea, 0, 1);
+
+        // Set expandable Exception into the dialog pane.
+        alert.getDialogPane().setExpandableContent(expContent);
+
+        alert.showAndWait();
+
+        System.exit(-1);
+    }
+
+    public void returnToMainMenu() {
+        startGroup = new VBox();
+        enterNamesGroup = new VBox();
+        gameGroup = new StackPane();
+        waitGroup = new VBox();
+        actualPlayer = 0;
+        playerMode = 0;
+        actualShip = 0;
+        players = new Player[2];
+        firstShot = 0;
+        cacheHitAttempts = 0;
+        cacheHitShips = 0;
+        this.startGame();
+    }
+
     private class fadeIn extends AnimationTimer {
         @Override
         public void handle (long now) {
-            opacity += 0.02;
             lbl.opacityProperty().set(opacity);
             if (opacity >= 1) {
                 stop();
             }
+            opacity += 0.02;
         }
     }
 
@@ -623,6 +717,7 @@ public class Game extends Application {
                     end = processShot();
                 } else {
                     if (end == 1) {
+                        returnMenu.setDisable(false);
                         actualPlayer = 0;
                         step();
                     }
